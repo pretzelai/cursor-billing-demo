@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { lumen } from '@/lib/lumen'
+import { isFeatureEntitled, sendEvent } from '@/lib/lumen'
 
 /**
  * API Route: Tab Completion
  *
  * This endpoint handles AI-powered tab completions
- * Gated by:
+ * Gated by Lumen:
  * 1. User authentication
- * 2. Lumen feature entitlement check
- * 3. Lumen usage limits
+ * 2. Feature entitlement check (includes plan access + usage limits)
+ * 3. Usage tracking after consumption
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,58 +17,34 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
 
     // 2. Check if user has access to AI completions feature
-    const hasAccess = await lumen.isFeatureEntitled(user.id, 'ai_completions')
+    // This checks both plan access AND usage limits (credits remaining)
+    const hasAccess = await isFeatureEntitled(user.id, 'ai-completions')
 
     if (!hasAccess) {
       return NextResponse.json(
         {
           error: 'feature_not_available',
-          message: 'Upgrade to Pro to access AI completions',
+          message: 'Upgrade to access AI completions or you have reached your usage limit',
           upgradeUrl: 'https://getlumen.dev/pricing'
         },
         { status: 402 } // Payment Required
       )
     }
 
-    // 3. Check usage limits
-    const usage = await lumen.getUsage(user.id)
-
-    if (usage.ai_completions >= usage.ai_completions_limit) {
-      return NextResponse.json(
-        {
-          error: 'usage_limit_reached',
-          message: `You've reached your limit of ${usage.ai_completions_limit} completions this month`,
-          current: usage.ai_completions,
-          limit: usage.ai_completions_limit,
-          upgradeUrl: 'https://getlumen.dev/pricing'
-        },
-        { status: 429 } // Too Many Requests
-      )
-    }
-
-    // 4. Track the usage event
-    await lumen.sendEvent({
-      userId: user.id,
-      eventName: 'ai_completion',
-      value: 1,
-      timestamp: new Date().toISOString()
-    })
-
-    // 5. Get request body (context for completion)
+    // 3. Get request body (context for completion)
     const body = await request.json()
     const { code, cursorPosition } = body
 
-    // 6. Generate completion (in real app, this would call OpenAI/Anthropic)
+    // 4. Generate completion (in real app, this would call OpenAI/Anthropic)
     const completion = generateCompletion(code, cursorPosition)
+
+    // 5. Track the usage event AFTER successful completion
+    // Lumen will record this consumption for billing and quota tracking
+    await sendEvent(user.id, 'ai-completions')
 
     return NextResponse.json({
       success: true,
-      completion,
-      usage: {
-        current: usage.ai_completions + 1,
-        limit: usage.ai_completions_limit,
-        remaining: usage.ai_completions_limit - usage.ai_completions - 1
-      }
+      completion
     })
 
   } catch (error: any) {

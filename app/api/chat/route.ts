@@ -1,89 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth'
-import { lumen } from '@/lib/lumen'
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
+import { isFeatureEntitled, sendEvent } from "@/lib/lumen";
 
 /**
  * API Route: AI Chat
  *
  * This endpoint handles AI chat messages
- * Gated by:
+ * Gated by Lumen:
  * 1. User authentication
- * 2. Lumen feature entitlement check
- * 3. Lumen usage limits
+ * 2. Feature entitlement check (includes plan access + usage limits)
+ * 3. Usage tracking after consumption
  */
 export async function POST(request: NextRequest) {
   try {
     // 1. Check if user is authenticated
-    const user = await requireAuth()
+    const user = await requireAuth();
 
-    // 2. Check if user has access to AI messages feature
-    const hasAccess = await lumen.isFeatureEntitled(user.id, 'ai_messages')
+    // 2. Check if user has access to AI chat feature
+    // This checks both plan access AND usage limits (credits remaining)
+    const hasAccess = await isFeatureEntitled(user.id, "ai-messages");
 
     if (!hasAccess) {
       return NextResponse.json(
         {
-          error: 'feature_not_available',
-          message: 'Upgrade to Pro to access AI chat',
-          upgradeUrl: 'https://getlumen.dev/pricing'
+          error: "feature_not_available",
+          message:
+            "Upgrade to access AI chat or you have reached your usage limit",
+          upgradeUrl: "http://localhost:3000/pricing",
         },
         { status: 402 } // Payment Required
-      )
+      );
     }
 
-    // 3. Check usage limits
-    const usage = await lumen.getUsage(user.id)
+    // 3. Get request body
+    const body = await request.json();
+    const { message, conversationHistory } = body;
 
-    if (usage.ai_messages >= usage.ai_messages_limit) {
-      return NextResponse.json(
-        {
-          error: 'usage_limit_reached',
-          message: `You've reached your limit of ${usage.ai_messages_limit} AI messages this month. Upgrade for more!`,
-          current: usage.ai_messages,
-          limit: usage.ai_messages_limit,
-          upgradeUrl: 'https://getlumen.dev/pricing'
-        },
-        { status: 429 } // Too Many Requests
-      )
-    }
+    // 4. Generate AI response (in real app, this would call OpenAI/Anthropic)
+    const aiResponse = generateAIResponse(message, conversationHistory);
 
-    // 4. Track the usage event
-    await lumen.sendEvent({
-      userId: user.id,
-      eventName: 'ai_message',
-      value: 1,
-      timestamp: new Date().toISOString()
-    })
-
-    // 5. Get request body
-    const body = await request.json()
-    const { message, conversationHistory } = body
-
-    // 6. Generate AI response (in real app, this would call OpenAI/Anthropic)
-    const aiResponse = generateAIResponse(message, conversationHistory)
+    // 5. Track the usage event AFTER successful response generation
+    // Lumen will record this consumption for billing and quota tracking
+    await sendEvent(user.id, "ai-messages");
 
     return NextResponse.json({
       success: true,
       response: aiResponse,
-      usage: {
-        current: usage.ai_messages + 1,
-        limit: usage.ai_messages_limit,
-        remaining: usage.ai_messages_limit - usage.ai_messages - 1
-      }
-    })
-
+    });
   } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+    if (error.message === "Unauthorized") {
       return NextResponse.json(
-        { error: 'unauthorized', message: 'Please log in' },
+        { error: "unauthorized", message: "Please log in" },
         { status: 401 }
-      )
+      );
     }
 
-    console.error('[API] Chat error:', error)
+    console.error("[API] Chat error:", error);
     return NextResponse.json(
-      { error: 'internal_error', message: 'Something went wrong' },
+      { error: "internal_error", message: "Something went wrong" },
       { status: 500 }
-    )
+    );
   }
 }
 
@@ -92,12 +68,12 @@ export async function POST(request: NextRequest) {
  * In a real app, this would call an AI model with the conversation context
  */
 function generateAIResponse(userMessage: string, history?: any[]): string {
-  const lowerMessage = userMessage.toLowerCase()
+  const lowerMessage = userMessage.toLowerCase();
 
   // Same demo responses as before, but now generated server-side
   const demoResponses = [
     {
-      trigger: ['search', 'filter', 'query'],
+      trigger: ["search", "filter", "query"],
       response: `To add search functionality with multiple filters, you can extend the query:
 
 \`\`\`typescript
@@ -130,7 +106,7 @@ async function searchProducts(query: string, filters?: {
 \`\`\``,
     },
     {
-      trigger: ['error', 'handling', 'try', 'catch'],
+      trigger: ["error", "handling", "try", "catch"],
       response: `Good practice to add error handling to your database queries:
 
 \`\`\`typescript
@@ -156,7 +132,7 @@ async function getProductById(id: string): Promise<Product | null> {
 Always validate input and handle edge cases!`,
     },
     {
-      trigger: ['optimize', 'performance', 'slow', 'faster'],
+      trigger: ["optimize", "performance", "slow", "faster"],
       response: `Here are some ways to optimize your product queries:
 
 \`\`\`typescript
@@ -183,7 +159,7 @@ async function getProductById(id: string) {
 \`\`\``,
     },
     {
-      trigger: ['type', 'typescript', 'interface'],
+      trigger: ["type", "typescript", "interface"],
       response: `You can extend the Product interface for better type safety:
 
 \`\`\`typescript
@@ -210,7 +186,7 @@ type CreateProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
 \`\`\``,
     },
     {
-      trigger: ['test', 'testing', 'jest'],
+      trigger: ["test", "testing", "jest"],
       response: `Here's how to test your product functions:
 
 \`\`\`typescript
@@ -241,7 +217,7 @@ describe('Product Functions', () => {
 \`\`\``,
     },
     {
-      trigger: ['validation', 'validate', 'check'],
+      trigger: ["validation", "validate", "check"],
       response: `Add validation to ensure data integrity:
 
 \`\`\`typescript
@@ -277,11 +253,11 @@ async function createProduct(product: CreateProductInput) {
 }
 \`\`\``,
     },
-  ]
+  ];
 
   for (const demo of demoResponses) {
     if (demo.trigger.some((trigger) => lowerMessage.includes(trigger))) {
-      return demo.response
+      return demo.response;
     }
   }
 
@@ -294,5 +270,5 @@ async function createProduct(product: CreateProductInput) {
 • Performance optimization
 • Testing strategies
 
-Try asking me something about the product catalog code!`
+Try asking me something about the product catalog code!`;
 }
