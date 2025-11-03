@@ -92,37 +92,71 @@ export {
   getProductsByCategory
 }`
 
-const completionSuggestion = `  const products = await getProductsByCategory('electronics')
-  console.log('Found products:', products.length)`
-
 export default function CodeEditor({ fileName, showCompletion, onShowCompletion }: CodeEditorProps) {
   const [code, setCode] = useState(sampleCode)
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 0, column: 0 })
+  const [completionSuggestion, setCompletionSuggestion] = useState('')
+  const [completionError, setCompletionError] = useState<string | null>(null)
+  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false)
   const editorRef = useRef<any>(null)
+
+  const fetchCompletion = async () => {
+    setIsLoadingCompletion(true)
+    setCompletionError(null)
+
+    try {
+      const response = await fetch('/api/completion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          cursorPosition
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Handle Lumen gates (402 = feature not available, 429 = usage limit)
+        if (response.status === 402 || response.status === 429) {
+          setCompletionError(data.message)
+          onShowCompletion(true)
+          setTimeout(() => onShowCompletion(false), 5000)
+          return
+        }
+        throw new Error(data.message || 'Failed to get completion')
+      }
+
+      setCompletionSuggestion(data.completion)
+      onShowCompletion(true)
+      setTimeout(() => onShowCompletion(false), 3000)
+
+    } catch (error: any) {
+      console.error('Completion error:', error)
+      setCompletionError(error.message || 'Failed to get completion')
+    } finally {
+      setIsLoadingCompletion(false)
+    }
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Tab key for completion
       if (e.key === 'Tab' && !e.shiftKey) {
         e.preventDefault()
-        onShowCompletion(true)
-
-        // Hide after 3 seconds
-        setTimeout(() => onShowCompletion(false), 3000)
+        fetchCompletion()
       }
 
       // Ctrl/Cmd + Space for completion
       if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
-        onShowCompletion(true)
-
-        setTimeout(() => onShowCompletion(false), 3000)
+        fetchCompletion()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onShowCompletion])
+  }, [code, cursorPosition])
 
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor
@@ -167,20 +201,40 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
         {/* Tab completion popup */}
         {showCompletion && (
           <div
-            className="absolute bg-[#2d2d30] border border-blue-500 rounded shadow-lg p-2 z-50"
+            className="absolute bg-[#2d2d30] rounded shadow-lg p-3 z-50 max-w-md"
             style={{
               top: `${cursorPosition.lineNumber * 19}px`,
               left: '50%',
               transform: 'translateX(-50%)',
+              border: completionError ? '1px solid #f87171' : '1px solid #3b82f6'
             }}
           >
-            <div className="text-xs text-gray-400 mb-1">Lumen AI Suggestion:</div>
-            <pre className="text-sm text-green-400 font-mono whitespace-pre">
-              {completionSuggestion}
-            </pre>
-            <div className="text-xs text-gray-500 mt-2">
-              Press <kbd className="px-1 bg-gray-700 rounded">Tab</kbd> to accept
-            </div>
+            {completionError ? (
+              <>
+                <div className="text-xs text-red-400 mb-1">⚠️ {completionError}</div>
+                <div className="text-xs text-gray-400 mt-2">
+                  <a
+                    href="https://getlumen.dev/pricing"
+                    target="_blank"
+                    className="text-blue-400 hover:underline"
+                  >
+                    Upgrade your plan
+                  </a>
+                </div>
+              </>
+            ) : isLoadingCompletion ? (
+              <div className="text-xs text-gray-400">Loading completion...</div>
+            ) : (
+              <>
+                <div className="text-xs text-gray-400 mb-1">AI Suggestion:</div>
+                <pre className="text-sm text-green-400 font-mono whitespace-pre">
+                  {completionSuggestion}
+                </pre>
+                <div className="text-xs text-gray-500 mt-2">
+                  Press <kbd className="px-1 bg-gray-700 rounded">Tab</kbd> to accept
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -194,7 +248,6 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
         </div>
         <div className="flex gap-4">
           <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
-          <span>Powered by Lumen</span>
         </div>
       </div>
     </div>
