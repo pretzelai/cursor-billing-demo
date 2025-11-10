@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@getlumen/server": "^0.1.12",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-label": "^2.1.7",
