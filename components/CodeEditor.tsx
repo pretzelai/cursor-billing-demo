@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import Editor from '@monaco-editor/react'
+import { useEffect, useRef, useState } from "react";
+import Editor from "@monaco-editor/react";
 
 interface CodeEditorProps {
-  fileName: string
-  showCompletion: boolean
-  onShowCompletion: (show: boolean) => void
+  fileName: string;
+  showCompletion: boolean;
+  onShowCompletion: (show: boolean) => void;
 }
 
 const sampleCode = `import { db } from '@/lib/database'
@@ -90,84 +90,138 @@ export {
   createProduct,
   updateStock,
   getProductsByCategory
-}`
+}`;
 
-export default function CodeEditor({ fileName, showCompletion, onShowCompletion }: CodeEditorProps) {
-  const [code, setCode] = useState(sampleCode)
-  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 0, column: 0 })
-  const [completionSuggestion, setCompletionSuggestion] = useState('')
-  const [completionError, setCompletionError] = useState<string | null>(null)
-  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false)
-  const editorRef = useRef<any>(null)
+export default function CodeEditor({
+  fileName,
+  showCompletion,
+  onShowCompletion,
+}: CodeEditorProps) {
+  const [code, setCode] = useState(sampleCode);
+  const [cursorPosition, setCursorPosition] = useState({
+    lineNumber: 0,
+    column: 0,
+  });
+  const [completionSuggestion, setCompletionSuggestion] = useState("");
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
+  const editorRef = useRef<any>(null);
+  const completionSuggestionRef = useRef("");
+  const showCompletionRef = useRef(false);
+  const isLoadingCompletionRef = useRef(false);
+  const completionErrorRef = useRef<string | null>(null);
 
   const fetchCompletion = async () => {
-    setIsLoadingCompletion(true)
-    setCompletionError(null)
+    setIsLoadingCompletion(true);
+    isLoadingCompletionRef.current = true;
+    setCompletionError(null);
+    completionErrorRef.current = null;
 
     try {
-      const response = await fetch('/api/completion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/completion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          cursorPosition
-        })
-      })
+          cursorPosition,
+        }),
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
         // Handle Lumen gates (402 = feature not available, 429 = usage limit)
         if (response.status === 402 || response.status === 429) {
-          setCompletionError(data.message)
-          onShowCompletion(true)
-          setTimeout(() => onShowCompletion(false), 5000)
-          return
+          setCompletionError(data.message);
+          completionErrorRef.current = data.message;
+          onShowCompletion(true);
+          showCompletionRef.current = true;
+          setTimeout(() => {
+            onShowCompletion(false);
+            showCompletionRef.current = false;
+          }, 5000);
+          return;
         }
-        throw new Error(data.message || 'Failed to get completion')
+        throw new Error(data.message || "Failed to get completion");
       }
 
-      setCompletionSuggestion(data.completion)
-      onShowCompletion(true)
-      setTimeout(() => onShowCompletion(false), 3000)
-
+      setCompletionSuggestion(data.completion);
+      completionSuggestionRef.current = data.completion;
+      onShowCompletion(true);
+      showCompletionRef.current = true;
+      setTimeout(() => {
+        onShowCompletion(false);
+        showCompletionRef.current = false;
+      }, 3000);
     } catch (error: any) {
-      console.error('Completion error:', error)
-      setCompletionError(error.message || 'Failed to get completion')
+      console.error("Completion error:", error);
+      setCompletionError(error.message || "Failed to get completion");
+      completionErrorRef.current = error.message || "Failed to get completion";
     } finally {
-      setIsLoadingCompletion(false)
+      setIsLoadingCompletion(false);
+      isLoadingCompletionRef.current = false;
     }
-  }
+  };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Tab key for completion
-      if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault()
-        fetchCompletion()
-      }
-
-      // Ctrl/Cmd + Space for completion
-      if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault()
-        fetchCompletion()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [code, cursorPosition])
-
-  const handleEditorDidMount = (editor: any) => {
-    editorRef.current = editor
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
 
     editor.onDidChangeCursorPosition((e: any) => {
       setCursorPosition({
         lineNumber: e.position.lineNumber,
         column: e.position.column,
-      })
-    })
-  }
+      });
+    });
+
+    // Register Tab key command for completions
+    editor.addCommand(monaco.KeyCode.Tab, () => {
+      // If completion is shown, accept it
+      if (
+        showCompletionRef.current &&
+        completionSuggestionRef.current &&
+        !isLoadingCompletionRef.current &&
+        !completionErrorRef.current
+      ) {
+        const position = editor.getPosition();
+
+        // Insert the completion at cursor position
+        const range = new monaco.Range(
+          position.lineNumber,
+          position.column,
+          position.lineNumber,
+          position.column
+        );
+
+        editor.executeEdits("insert-completion", [
+          {
+            range,
+            text: completionSuggestionRef.current,
+          },
+        ]);
+
+        // Move cursor to end of inserted text
+        const newPosition = {
+          lineNumber: position.lineNumber,
+          column: position.column + completionSuggestionRef.current.length,
+        };
+        editor.setPosition(newPosition);
+
+        // Hide completion popup
+        onShowCompletion(false);
+        showCompletionRef.current = false;
+        setCompletionSuggestion("");
+        completionSuggestionRef.current = "";
+      } else {
+        // Otherwise, trigger a new completion
+        fetchCompletion();
+      }
+    });
+
+    // Register Ctrl/Cmd + Space for triggering completions
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
+      fetchCompletion();
+    });
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -184,17 +238,17 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
           height="100%"
           defaultLanguage="typescript"
           value={code}
-          onChange={(value) => setCode(value || '')}
+          onChange={(value) => setCode(value || "")}
           theme="vs-dark"
           onMount={handleEditorDidMount}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
-            lineNumbers: 'on',
+            lineNumbers: "on",
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 2,
-            wordWrap: 'on',
+            wordWrap: "on",
           }}
         />
 
@@ -204,14 +258,18 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
             className="absolute bg-[#2d2d30] rounded shadow-lg p-3 z-50 max-w-md"
             style={{
               top: `${cursorPosition.lineNumber * 19}px`,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              border: completionError ? '1px solid #f87171' : '1px solid #3b82f6'
+              left: "50%",
+              transform: "translateX(-50%)",
+              border: completionError
+                ? "1px solid #f87171"
+                : "1px solid #3b82f6",
             }}
           >
             {completionError ? (
               <>
-                <div className="text-xs text-red-400 mb-1">⚠️ {completionError}</div>
+                <div className="text-xs text-red-400 mb-1">
+                  ⚠️ {completionError}
+                </div>
                 <div className="text-xs text-gray-400 mt-2">
                   <a
                     href="https://getlumen.dev/pricing"
@@ -231,7 +289,8 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
                   {completionSuggestion}
                 </pre>
                 <div className="text-xs text-gray-500 mt-2">
-                  Press <kbd className="px-1 bg-gray-700 rounded">Tab</kbd> to accept
+                  Press <kbd className="px-1 bg-gray-700 rounded">Tab</kbd> to
+                  accept
                 </div>
               </>
             )}
@@ -247,9 +306,11 @@ export default function CodeEditor({ fileName, showCompletion, onShowCompletion 
           <span>LF</span>
         </div>
         <div className="flex gap-4">
-          <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+          <span>
+            Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}
+          </span>
         </div>
       </div>
     </div>
-  )
+  );
 }
