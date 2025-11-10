@@ -1,30 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
 import { generateAIResponse } from "@/lib/ai-responses";
-// import { isFeatureEntitled, sendEvent } from "@/lib/lumen";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth();
-
-    // const hasAccess = await isFeatureEntitled(user.id, "ai-messages");
-    // if (!hasAccess) {
-    //   return NextResponse.json(
-    //     {
-    //       error: "feature_not_available",
-    //       message: "Upgrade to access AI chat or you have reached your usage limit",
-    //       upgradeUrl: "http://localhost:3000/pricing",
-    //     },
-    //     { status: 402 }
-    //   );
-    // }
-
     const body = await request.json();
     const { message, conversationHistory } = body;
 
     const aiResponse = generateAIResponse(message, conversationHistory);
-
-    // await sendEvent(user.id, "ai-messages");
 
     return NextResponse.json({
       success: true,
