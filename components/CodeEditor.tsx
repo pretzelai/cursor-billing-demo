@@ -188,7 +188,7 @@ export default function CodeEditor({
           position.lineNumber,
           position.column,
           position.lineNumber,
-          position.column,
+          position.column
         );
 
         editor.executeEdits("insert-completion", [
@@ -271,7 +271,7 @@ export default function CodeEditor({
                 </div>
                 <div className="text-xs text-gray-400 mt-2">
                   <a
-                    href="https://cursor.stripe.doctor/pricing"
+                    href="https://cursor.paymentsdb.com/pricing"
                     target="_blank"
                     className="text-blue-400 hover:underline"
                   >
