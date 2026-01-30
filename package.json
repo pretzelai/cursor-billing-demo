@@ -24,7 +24,7 @@
     "pg": "^8.17.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "stripe-no-webhooks": "^0.0.16",
+    "stripe-no-webhooks": "^0.0.17",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"
   },
