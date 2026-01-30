@@ -1,15 +1,15 @@
-import { defineConfig } from "stripe-no-webhooks";
+import { BillingConfig } from "stripe-no-webhooks";
 
-export default defineConfig({
+const billingConfig: BillingConfig = {
   test: {
     plans: [
       {
-        id: "prod_Tt33OTGHadmPDv",
+        id: "prod_Tt4spzYHMqqEJr",
         name: "Free",
         description: "Cursor free plan",
         price: [
           {
-            id: "price_1SvGx4Hl6H1Zw3aLHjviBZJu",
+            id: "price_1SvIisPK0CzHw6Ehvmhl9nDD",
             amount: 0,
             currency: "usd",
             interval: "month",
@@ -31,18 +31,18 @@ export default defineConfig({
         },
       },
       {
-        id: "prod_Tt337BMhz7UN3H",
+        id: "prod_Tt4sKcqDWOUbCE",
         name: "Pro",
         description: "Cursor Pro plan",
         price: [
           {
-            id: "price_1SvGx5Hl6H1Zw3aLGZNGRRBY",
+            id: "price_1SvIisPK0CzHw6EhDELgMJUg",
             amount: 1000,
             currency: "usd",
             interval: "month",
           },
           {
-            id: "price_1SvGx5Hl6H1Zw3aLEOgEWcsC",
+            id: "price_1SvIitPK0CzHw6EhDmbPgQgb",
             amount: 10000,
             currency: "usd",
             interval: "year",
@@ -68,4 +68,5 @@ export default defineConfig({
   production: {
     plans: [],
   },
-});
+};
+export default billingConfig;
