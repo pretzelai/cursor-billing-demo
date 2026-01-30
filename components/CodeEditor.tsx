@@ -130,7 +130,6 @@ export default function CodeEditor({
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle Lumen gates (402 = feature not available, 429 = usage limit)
         if (response.status === 402 || response.status === 429) {
           setCompletionError(data.message);
           completionErrorRef.current = data.message;
@@ -189,7 +188,7 @@ export default function CodeEditor({
           position.lineNumber,
           position.column,
           position.lineNumber,
-          position.column
+          position.column,
         );
 
         editor.executeEdits("insert-completion", [
@@ -272,7 +271,7 @@ export default function CodeEditor({
                 </div>
                 <div className="text-xs text-gray-400 mt-2">
                   <a
-                    href="https://getlumen.dev/pricing"
+                    href="https://cursor.stripe.doctor/pricing"
                     target="_blank"
                     className="text-blue-400 hover:underline"
                   >

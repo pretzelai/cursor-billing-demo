@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Lumen Billing Demo - Cursor Style',
-  description: 'Demo app for Lumen billing integration',
+  title: 'stripe-no-webhooks - Cursor Style',
+  description: 'Demo app for stripe-no-webhooks integration',
 }
 
 export default function RootLayout({

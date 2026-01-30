@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCompletion } from "@/lib/completions";
 import { getCurrentUser } from "@/lib/auth";
-import { isFeatureEntitled, sendEvent } from "@getlumen/server";
+import { billing } from "@/lib/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,17 +10,18 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Check if user has access to tab-completions feature
-    const hasAccess = await isFeatureEntitled({
-      feature: "tab-completions",
+    // stripe-no-webhooks credits check
+    const hasCredits = await billing.credits.hasCredits({
       userId: user.id,
+      key: "tab-completions",
+      amount: 1,
     });
 
-    if (!hasAccess) {
+    if (!hasCredits) {
       return NextResponse.json(
         {
           error: "feature_limited",
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
             "You've reached your tab completions limit. Please upgrade your plan.",
           upgradeUrl: "/pricing",
         },
-        { status: 402 }
+        { status: 402 },
       );
     }
 
@@ -37,11 +38,11 @@ export async function POST(request: NextRequest) {
 
     const completion = generateCompletion(code, cursorPosition);
 
-    // Record usage after successful completion
-    await sendEvent({
-      name: "tab-completions",
+    // stripe-no-webhooks credits consumption
+    await billing.credits.consume({
       userId: user.id,
-      value: 500,
+      key: "tab-completions",
+      amount: 1,
     });
 
     return NextResponse.json({
@@ -52,14 +53,14 @@ export async function POST(request: NextRequest) {
     if (error.message === "Unauthorized") {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     console.error("[API] Completion error:", error);
     return NextResponse.json(
       { error: "internal_error", message: "Something went wrong" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

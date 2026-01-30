@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAIResponse } from "@/lib/ai-responses";
 import { getCurrentUser } from "@/lib/auth";
-import { isFeatureEntitled, sendEvent } from "@getlumen/server";
+import { billing } from "@/lib/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,17 +10,18 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Check if user has access to ai-chat feature
-    const hasAccess = await isFeatureEntitled({
-      feature: "ai-chat",
+    // stripe-no-webhooks credits check
+    const hasCredits = await billing.credits.hasCredits({
       userId: user.id,
+      key: "ai-chat",
+      amount: 1,
     });
 
-    if (!hasAccess) {
+    if (!hasCredits) {
       return NextResponse.json(
         {
           error: "feature_limited",
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
             "You've reached your AI chat limit. Please upgrade your plan.",
           upgradeUrl: "/pricing",
         },
-        { status: 402 }
+        { status: 402 },
       );
     }
 
@@ -37,10 +38,11 @@ export async function POST(request: NextRequest) {
 
     const aiResponse = generateAIResponse(message, conversationHistory);
 
-    // Record usage after successful completion
-    await sendEvent({
-      name: "ai-chat",
+    // stripe-no-webhooks credits consumption
+    await billing.credits.consume({
       userId: user.id,
+      key: "ai-chat",
+      amount: 1,
     });
 
     return NextResponse.json({
@@ -51,14 +53,14 @@ export async function POST(request: NextRequest) {
     if (error.message === "Unauthorized") {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     console.error("[API] Chat error:", error);
     return NextResponse.json(
       { error: "internal_error", message: "Something went wrong" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

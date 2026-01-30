@@ -54,7 +54,6 @@ export default function ChatPanel() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Handle Lumen gates (402 = feature not available, 429 = usage limit)
         if (response.status === 402 || response.status === 429) {
           const assistantMessage: Message = {
             role: 'assistant',
