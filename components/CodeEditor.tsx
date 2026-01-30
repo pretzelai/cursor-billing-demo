@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
+import { emitCreditsConsumed } from "@/lib/credit-events";
 
 interface CodeEditorProps {
   fileName: string;
@@ -148,6 +149,7 @@ export default function CodeEditor({
       completionSuggestionRef.current = data.completion;
       onShowCompletion(true);
       showCompletionRef.current = true;
+      emitCreditsConsumed();
       setTimeout(() => {
         onShowCompletion(false);
         showCompletionRef.current = false;

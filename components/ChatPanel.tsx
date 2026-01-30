@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles } from 'lucide-react'
+import { emitCreditsConsumed } from '@/lib/credit-events'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -72,6 +73,7 @@ export default function ChatPanel() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+      emitCreditsConsumed()
     } catch (error: any) {
       console.error('Chat error:', error)
       const errorMessage: Message = {
