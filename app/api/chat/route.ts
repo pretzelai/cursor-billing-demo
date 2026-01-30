@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
             "You've reached your AI chat limit. Please upgrade your plan.",
           upgradeUrl: "/pricing",
         },
-        { status: 402 },
+        { status: 402 }
       );
     }
 
@@ -53,14 +53,14 @@ export async function POST(request: NextRequest) {
     if (error.message === "Unauthorized") {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
     console.error("[API] Chat error:", error);
     return NextResponse.json(
       { error: "internal_error", message: "Something went wrong" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

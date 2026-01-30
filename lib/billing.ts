@@ -1,6 +1,7 @@
 import { Billing } from "stripe-no-webhooks";
 import billingConfig from "../billing.config";
 import type { Stripe } from "stripe";
+import { getCurrentUser } from "@/lib/auth";
 
 // TODO: Import your auth library - see some examples below
 // import { currentUser } from "@clerk/nextjs/server";
@@ -26,17 +27,8 @@ export const billing = new Billing({
   // REQUIRED: Return { id, email?, name? } or null if not authenticated
   // Email/name are used when creating a new Stripe customer
   resolveUser: async () => {
-    // Clerk (requires clerkMiddleware in middleware.ts):
-    // const user = await currentUser();
-    // if (!user) return null;
-    // return { id: user.id, email: user.emailAddresses[0]?.emailAddress, name: user.fullName ?? undefined };
-
-    // Better Auth:
-    // const session = await betterAuth.api.getSession({ headers: await headers() });
-    // if (!session?.user) return null;
-    // return { id: session.user.id, email: session.user.email, name: session.user.name };
-
-    return null; // TODO: Replace with your auth
+    const user = await getCurrentUser();
+    return user;
   },
 
   // OPTIONAL: Add callbacks for subscription/credit events
