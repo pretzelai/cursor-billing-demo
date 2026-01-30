@@ -10,14 +10,14 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
     // stripe-no-webhooks credits check
     const hasCredits = await billing.credits.hasCredits({
       userId: user.id,
-      key: "tab-completions",
+      key: "tab-completion",
       amount: 1,
     });
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
             "You've reached your tab completions limit. Please upgrade your plan.",
           upgradeUrl: "/pricing",
         },
-        { status: 402 },
+        { status: 402 }
       );
     }
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     // stripe-no-webhooks credits consumption
     await billing.credits.consume({
       userId: user.id,
-      key: "tab-completions",
+      key: "tab-completion",
       amount: 1,
     });
 
@@ -53,14 +53,14 @@ export async function POST(request: NextRequest) {
     if (error.message === "Unauthorized") {
       return NextResponse.json(
         { error: "unauthorized", message: "Please log in" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
     console.error("[API] Completion error:", error);
     return NextResponse.json(
       { error: "internal_error", message: "Something went wrong" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
